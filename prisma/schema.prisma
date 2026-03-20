@@ -1,0 +1,243 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth (NextAuth v5 required tables) ────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Core User ──────────────────────────────────────────────────────────────
+
+model User {
+  id                    String              @id @default(cuid())
+  name                  String?
+  email                 String?             @unique
+  emailVerified         DateTime?
+  image                 String?
+  password              String?
+  role                  String              @default("candidate")
+  onboardingComplete    Boolean             @default(false)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  accounts              Account[]
+  sessions              Session[]
+  interviewerProfile    InterviewerProfile?
+  candidateProfile      CandidateProfile?
+  bookingsAsCandidate   Booking[]           @relation("CandidateBookings")
+  bookingsAsInterviewer Booking[]           @relation("InterviewerBookings")
+  ratingsGiven          Rating[]            @relation("RatingsGiven")
+  ratingsReceived       Rating[]            @relation("RatingsReceived")
+  feedbackGiven         Feedback[]          @relation("FeedbackGiven")
+  feedbackReceived      Feedback[]          @relation("FeedbackReceived")
+}
+
+// ─── Interviewer Profile ────────────────────────────────────────────────────
+
+model InterviewerProfile {
+  id              String             @id @default(cuid())
+  userId          String             @unique
+  company         String
+  jobTitle        String
+  yearsExp        Int
+  domains         String             // JSON: ["DSA","System Design","Behavioral"]
+  bio             String?
+  linkedinUrl     String?
+  hourlyRate      Float              @default(50)
+  languages       String             @default("[\"English\"]")
+  isVerified      Boolean            @default(false)
+  isFeatured      Boolean            @default(false)
+  ratingAvg       Float              @default(0)
+  ratingCount     Int                @default(0)
+  completeness    Int                @default(0)
+  stripeAccountId String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  availability    AvailabilitySlot[]
+}
+
+// ─── Candidate Profile ──────────────────────────────────────────────────────
+
+model CandidateProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  targetRole      String
+  experienceLevel String   // fresher | junior | mid | senior
+  domains         String   // JSON: ["DSA","Frontend"]
+  resumeUrl       String?
+  completeness    Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Availability & Booking ─────────────────────────────────────────────────
+
+model AvailabilitySlot {
+  id            String             @id @default(cuid())
+  interviewerId String
+  weekday       Int                // 0=Sun … 6=Sat
+  startTime     String             // "09:00"
+  endTime       String             // "10:00"
+  durationMins  Int                @default(60)
+  isActive      Boolean            @default(true)
+  createdAt     DateTime           @default(now())
+  interviewer   InterviewerProfile @relation(fields: [interviewerId], references: [id], onDelete: Cascade)
+  bookings      Booking[]
+}
+
+model Booking {
+  id                String            @id @default(cuid())
+  candidateId       String
+  interviewerId     String
+  slotId            String
+  scheduledAt       DateTime
+  durationMins      Int               @default(60)
+  status            String            @default("pending")  // pending | confirmed | cancelled | completed | no_show
+  interviewType     String            @default("mock")     // mock | screening | domain
+  focusTopic        String?
+  meetLink          String?
+  calendarEventId   String?
+  timezone          String            @default("UTC")
+  amount            Float             @default(50)
+  platformFee       Float             @default(10)
+  interviewerPayout Float             @default(40)
+  stripePaymentId   String?
+  cancelledAt       DateTime?
+  cancelledBy       String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  candidate         User              @relation("CandidateBookings", fields: [candidateId], references: [id])
+  interviewer       User              @relation("InterviewerBookings", fields: [interviewerId], references: [id])
+  slot              AvailabilitySlot  @relation(fields: [slotId], references: [id])
+  session           InterviewSession?
+  feedback          Feedback?
+  ratings           Rating[]
+}
+
+// ─── Interview Session ──────────────────────────────────────────────────────
+
+model InterviewSession {
+  id            String    @id @default(cuid())
+  bookingId     String    @unique
+  startedAt     DateTime?
+  endedAt       DateTime?
+  noShowBy      String?
+  whiteboardUrl String?
+  sessionNotes  String?
+  createdAt     DateTime  @default(now())
+  booking       Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+// ─── Feedback & Ratings ─────────────────────────────────────────────────────
+
+model Feedback {
+  id              String   @id @default(cuid())
+  bookingId       String   @unique
+  interviewerId   String
+  candidateId     String
+  problemSolving  Int      @default(0)
+  communication   Int      @default(0)
+  codeQuality     Int      @default(0)
+  systemDesign    Int      @default(0)
+  writtenFeedback String?
+  hireSignal      String?  // strong_yes | yes | maybe | no | strong_no
+  isShared        Boolean  @default(false)
+  shareToken      String?  @unique
+  createdAt       DateTime @default(now())
+  booking         Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  interviewer     User     @relation("FeedbackGiven", fields: [interviewerId], references: [id])
+  candidate       User     @relation("FeedbackReceived", fields: [candidateId], references: [id])
+}
+
+model Rating {
+  id         String   @id @default(cuid())
+  bookingId  String
+  fromUserId String
+  toUserId   String
+  stars      Int
+  comment    String?
+  isPublic   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fromUser   User     @relation("RatingsGiven", fields: [fromUserId], references: [id])
+  toUser     User     @relation("RatingsReceived", fields: [toUserId], references: [id])
+}
+
+// ─── Waitlist ───────────────────────────────────────────────────────────────
+
+model Waitlist {
+  id            String   @id @default(cuid())
+  candidateId   String
+  interviewerId String
+  createdAt     DateTime @default(now())
+
+  @@unique([candidateId, interviewerId])
+}
+
+// ─── Payout (sample data for UI) ────────────────────────────────────────────
+
+model Payout {
+  id               String    @id @default(cuid())
+  interviewerId    String
+  amount           Float
+  stripeTransferId String?
+  periodStart      DateTime
+  periodEnd        DateTime
+  status           String    @default("pending") // pending | paid | failed
+  paidAt           DateTime?
+  createdAt        DateTime  @default(now())
+}
+
+// ─── Blog ───────────────────────────────────────────────────────────────────
+
+model BlogPost {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  excerpt     String
+  content     String
+  category    String
+  readMinutes Int       @default(5)
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
