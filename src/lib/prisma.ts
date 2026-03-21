@@ -13,7 +13,7 @@ if (!dbUrl) {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient(
-    dbUrl ? { datasourceUrl: dbUrl } : {}
+    (dbUrl ? { datasourceUrl: dbUrl } : {}) as any
   );
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
