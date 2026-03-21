@@ -6,14 +6,12 @@ const globalForPrisma = globalThis as unknown as {
 
 const dbUrl = process.env.DATABASE_URL;
 
-if (!dbUrl) {
-  console.warn("⚠️ WARNING: DATABASE_URL is NOT set. Database features will fail at runtime.");
+if (dbUrl) {
+  console.log("✅ DATABASE_URL detected. Initializing Prisma client...");
 }
 
 export const prisma =
   globalForPrisma.prisma ??
-  new PrismaClient(
-    (dbUrl ? { datasourceUrl: dbUrl } : {}) as any
-  );
+  new (PrismaClient as any)();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
