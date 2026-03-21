@@ -27,12 +27,19 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true }, { status: 201 });
-  } catch (err) {
+  } catch (err: any) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.issues[0].message }, { status: 400 });
     }
     console.error("[Register] Error:", err);
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: `Internal server error: ${message}` }, { status: 500 });
+    return NextResponse.json({
+      error: "Internal server error",
+      details: err.message,
+      stack: err.stack,
+      env_check: {
+        has_db_url: !!process.env.DATABASE_URL,
+        db_url_len: process.env.DATABASE_URL?.length || 0
+      }
+    }, { status: 500 });
   }
 }
