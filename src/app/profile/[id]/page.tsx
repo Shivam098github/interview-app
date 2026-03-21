@@ -46,13 +46,10 @@ export default async function ProfilePage({
   const isOwnProfile = session?.user?.id === id;
   const isCandidate = session?.user?.role === "candidate";
 
-  const slotsByDay = profile.availability.reduce<Record<number, typeof profile.availability>>(
-    (acc, slot) => {
-      (acc[slot.weekday] = acc[slot.weekday] || []).push(slot);
-      return acc;
-    },
-    {}
-  );
+  const slotsByDay: Record<number, any[]> = {};
+  profile.availability.forEach((slot: any) => {
+    (slotsByDay[slot.weekday] = slotsByDay[slot.weekday] || []).push(slot);
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -148,11 +145,11 @@ export default async function ProfilePage({
                       <p className="text-sm text-gray-400">No availability set yet.</p>
                     ) : (
                       <div className="space-y-3">
-                        {Object.entries(slotsByDay).map(([day, slots]) => (
+                        {Object.entries(slotsByDay).map(([day, slots]: [string, any[]]) => (
                           <div key={day} className="flex items-start gap-4">
                             <span className="text-sm font-medium w-10 text-gray-500">{WEEKDAYS[Number(day)]}</span>
                             <div className="flex flex-wrap gap-2">
-                              {slots.map((slot) => (
+                              {slots.map((slot: any) => (
                                 <Badge key={slot.id} variant="secondary" className="text-xs">
                                   {slot.startTime} – {slot.endTime} ({slot.durationMins}min)
                                 </Badge>
@@ -170,7 +167,7 @@ export default async function ProfilePage({
                 {user.ratingsReceived.length === 0 ? (
                   <Card><CardContent className="pt-5 text-sm text-gray-400">No reviews yet.</CardContent></Card>
                 ) : (
-                  user.ratingsReceived.map((rating) => (
+                  user.ratingsReceived.map((rating: any) => (
                     <Card key={rating.id}>
                       <CardContent className="pt-4">
                         <div className="flex items-center gap-3 mb-2">
